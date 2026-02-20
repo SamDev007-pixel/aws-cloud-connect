@@ -165,6 +165,36 @@ const socketHandler = (io) => {
     });
 
     // =========================================
+    // DELETE ROOM
+    // =========================================
+    socket.on("delete_room", async ({ roomCode }) => {
+      try {
+        if (!roomCode) return;
+
+        const formattedCode = roomCode.trim().toUpperCase();
+        const room = await Room.findOne({ roomCode: formattedCode });
+
+        if (!room) return;
+
+        // Delete all users in the room
+        await User.deleteMany({ room: room._id });
+
+        // Delete all messages in the room
+        await Message.deleteMany({ room: room._id });
+
+        // Delete the room
+        await Room.findByIdAndDelete(room._id);
+
+        // Notify all users in the room
+        io.to(formattedCode).emit("room_deleted");
+
+        console.log("🗑️ Room deleted:", formattedCode);
+      } catch (err) {
+        console.error("Delete Room Error:", err.message);
+      }
+    });
+
+    // =========================================
     // KICK USER
     // =========================================
     socket.on("kick_user", async ({ userId }) => {

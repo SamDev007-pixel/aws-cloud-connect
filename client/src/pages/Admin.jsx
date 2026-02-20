@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import axios from "axios";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL;
+// Get server URL from env or use production fallback
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "https://aws-cloud-connect-server.onrender.com";
 
 const Admin = () => {
   const [roomCode, setRoomCode] = useState("");

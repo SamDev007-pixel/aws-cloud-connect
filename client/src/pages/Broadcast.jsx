@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL;
+// Get server URL from env or use production fallback
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "https://aws-cloud-connect-server.onrender.com";
 
 export default function Broadcast() {
   const [roomCode, setRoomCode] = useState("");
