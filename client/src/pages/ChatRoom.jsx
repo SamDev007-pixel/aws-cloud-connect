@@ -10,6 +10,14 @@ const ChatRoom = () => {
   const [status, setStatus] = useState("idle");
   const [userId, setUserId] = useState(null);
 
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    socketRef.current = io(SERVER_URL);
+
+    return () => socketRef.current.disconnect();
+  }, []);
+
   useEffect(() => {
     const saved = JSON.parse(sessionStorage.getItem("chatSession"));
     if (saved) {
@@ -20,12 +28,11 @@ const ChatRoom = () => {
     }
   }, []);
 
+  // 🔥 APPROVAL LISTENER (SINGLE SOCKET)
   useEffect(() => {
-    if (!userId) return;
+    if (!socketRef.current || !userId) return;
 
-    const socket = io(SERVER_URL);
-
-    socket.on("user_approved", (approvedUserId) => {
+    socketRef.current.on("user_approved", (approvedUserId) => {
       if (String(approvedUserId) === String(userId)) {
         setStatus("approved");
 
@@ -37,7 +44,9 @@ const ChatRoom = () => {
       }
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socketRef.current.off("user_approved");
+    };
   }, [userId]);
 
   const joinRoom = async () => {
@@ -63,6 +72,13 @@ const ChatRoom = () => {
           status: "pending",
         })
       );
+
+      socketRef.current.emit("join_room", {
+        roomCode,
+        role: "user",
+        userId: newUserId,
+      });
+
     } catch (err) {
       console.error("Join failed");
     }
@@ -72,7 +88,7 @@ const ChatRoom = () => {
     <div style={pageStyle}>
       {status !== "approved" && (
         <div style={joinCardStyle}>
-          <h2 style={{ marginBottom: "20px" }}>Join Chat Room</h2>
+          <h2>Join Chat Room</h2>
 
           {status === "idle" && (
             <>
@@ -95,81 +111,55 @@ const ChatRoom = () => {
           )}
 
           {status === "pending" && (
-            <div style={{ opacity: 0.7 }}>
-              Waiting for Super Admin approval...
-            </div>
+            <div>Waiting for Super Admin approval...</div>
           )}
         </div>
       )}
 
       {status === "approved" && (
-        <ChatInterface roomCode={roomCode} userId={userId} />
+        <ChatInterface
+          roomCode={roomCode}
+          userId={userId}
+          socket={socketRef.current}
+        />
       )}
     </div>
   );
 };
 
-const ChatInterface = ({ roomCode, userId }) => {
+const ChatInterface = ({ roomCode, userId, socket }) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-
-  const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    socketRef.current = io(SERVER_URL);
-
-    const socket = socketRef.current;
+    if (!socket) return;
 
     socket.emit("join_room", { roomCode, role: "user", userId });
 
     socket.on("load_messages", (msgs) => {
-  setMessages((prev) => {
-    const merged = [...msgs];
-
-    prev.forEach((oldMsg) => {
-      if (!merged.find((m) => m._id === oldMsg._id)) {
-        merged.push(oldMsg);
-      }
+      setMessages(msgs);
     });
 
-    return merged.sort(
-      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-    );
-  });
-});
     socket.on("receive_message", (msg) => {
-  setMessages((prev) => {
-    const exists = prev.find((m) => m._id === msg._id);
-    if (exists) return prev;
-    return [...prev, msg];
-  });
-});
+      setMessages((prev) => {
+        if (prev.find((m) => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
+    });
 
-    socket.on("approved_message", (msg) => {
-  setMessages((prev) => {
-    const exists = prev.find((m) => m._id === msg._id);
-    if (exists) return prev;
-    return [...prev, msg];
-  });
-});
-
-    // Handle kicked from room
     socket.on("kicked_from_room", (data) => {
       alert(data.message);
       sessionStorage.removeItem("chatSession");
       window.location.reload();
     });
 
-    // Handle room deleted by admin
-    socket.on("room_deleted_by_admin", (data) => {
-      alert(data.message);
-      sessionStorage.removeItem("chatSession");
-      window.location.reload();
-    });
-
-    return () => socket.disconnect();
-  }, [roomCode, userId]);
+    return () => {
+      socket.off("load_messages");
+      socket.off("receive_message");
+      socket.off("kicked_from_room");
+    };
+  }, [socket, roomCode, userId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -178,7 +168,7 @@ const ChatInterface = ({ roomCode, userId }) => {
   const sendMessage = () => {
     if (!message.trim()) return;
 
-    socketRef.current.emit("send_message", {
+    socket.emit("send_message", {
       userId,
       roomCode,
       content: message,
@@ -189,62 +179,19 @@ const ChatInterface = ({ roomCode, userId }) => {
 
   return (
     <div style={chatLayoutStyle}>
-      {/* Top Bar */}
-      <div style={topBarStyle}>
-        <span style={{ fontWeight: 600 }}>AWS Cloud Connect</span>
-        <span style={{ fontSize: "12px", opacity: 0.6 }}>
-          Live Chat
-        </span>
-      </div>
-
-      {/* Messages */}
       <div style={messagesPanelStyle}>
-        {messages.map((msg) => {
-          const isOwn =
-            String(msg.sender?._id) === String(userId);
-
-          return (
-            <div
-              key={msg._id}
-              style={{
-                display: "flex",
-                marginBottom: "18px",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "12px", opacity: 0.6 }}>
-                  {msg.sender?.username}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "4px",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    background: isOwn
-                      ? "#360659"
-                      : "#1e1e28",
-                    color: "#f3f4f6",
-                    maxWidth: "65%",
-                  }}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {messages.map((msg) => (
+          <div key={msg._id}>
+            <strong>{msg.sender?.username}</strong>: {msg.content}
+          </div>
+        ))}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input Dock */}
       <div style={inputDockStyle}>
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") sendMessage();
-          }}
           placeholder="Message..."
           style={chatInputStyle}
         />
@@ -254,90 +201,6 @@ const ChatInterface = ({ roomCode, userId }) => {
       </div>
     </div>
   );
-};
-
-/* ================= STYLES ================= */
-
-const pageStyle = {
-  minHeight: "100vh",
-  background: "#0b0b12",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  padding: "30px",
-  fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-  color: "#f3f4f6",
-};
-
-const joinCardStyle = {
-  width: "350px",
-  padding: "30px",
-  background: "#151520",
-  borderRadius: "10px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "15px",
-};
-
-const chatLayoutStyle = {
-  width: "95%",
-  maxWidth: "1500px",
-  height: "92vh",
-  background: "#12121a",
-  borderRadius: "10px",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-  border: "1px solid #1f1f2e",
-};
-
-const topBarStyle = {
-  padding: "16px 20px",
-  borderBottom: "1px solid #1f1f2e",
-  display: "flex",
-  justifyContent: "space-between",
-  background: "#161622",
-};
-
-const messagesPanelStyle = {
-  flex: 1,
-  padding: "20px",
-  overflowY: "auto",
-  background: "#0f0f16",
-};
-
-const inputDockStyle = {
-  padding: "15px",
-  borderTop: "1px solid #1f1f2e",
-  display: "flex",
-  gap: "10px",
-  background: "#161622",
-};
-
-const inputStyle = {
-  padding: "10px",
-  borderRadius: "6px",
-  border: "1px solid #2a2a3a",
-  background: "#1a1a26",
-  color: "white",
-};
-
-const chatInputStyle = {
-  flex: 1,
-  padding: "10px",
-  borderRadius: "6px",
-  border: "1px solid #2a2a3a",
-  background: "#1a1a26",
-  color: "white",
-};
-
-const buttonStyle = {
-  padding: "10px 16px",
-  borderRadius: "6px",
-  border: "none",
-  background: "#6a0dad",
-  color: "white",
-  cursor: "pointer",
 };
 
 export default ChatRoom;
