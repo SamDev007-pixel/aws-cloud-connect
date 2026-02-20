@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
+const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 
 export default function Broadcast() {
   const [roomCode, setRoomCode] = useState("");

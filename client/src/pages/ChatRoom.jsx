@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
+const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 
 const ChatRoom = () => {
   const [username, setUsername] = useState("");
