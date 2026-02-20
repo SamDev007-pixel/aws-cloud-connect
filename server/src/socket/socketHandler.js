@@ -36,15 +36,14 @@ const socketHandler = (io) => {
         // ===============================
 
         if (role === "user") {
-          const approvedMessages = await Message.find({
-            room: room._id,
-            status: "approved",
-          })
-            .populate("sender", "username")
-            .sort({ createdAt: 1 });
+  const allMessages = await Message.find({
+    room: room._id,
+  })
+    .populate("sender", "username")
+    .sort({ createdAt: 1 });
 
-          socket.emit("load_messages", approvedMessages);
-        }
+  socket.emit("load_messages", allMessages);
+}
 
         if (role === "admin") {
           const pendingMessages = await Message.find({
@@ -104,7 +103,7 @@ const socketHandler = (io) => {
           .populate("sender", "username")
           .populate("room", "roomCode");
 
-        socket.emit("receive_message", populatedMessage);
+        io.to(formattedCode).emit("receive_message", populatedMessage);
         socket.emit("new_pending_message", populatedMessage);
 
       } catch (error) {
@@ -132,8 +131,6 @@ const socketHandler = (io) => {
     // Send to broadcast
     io.to(`broadcast_${roomCode}`).emit("broadcast_message", message);
 
-    // Send to users
-    io.to(roomCode).emit("approved_message", message);
 
   } catch (error) {
     console.error("Approve Message Error:", error.message);
