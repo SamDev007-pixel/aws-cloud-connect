@@ -75,7 +75,7 @@ const socketHandler = (io) => {
           isOnline: true,
         }).select("username role isOnline");
 
-        io.to(formattedCode).emit("superadmin_live_users", activeUsers);
+        socket.emit("superadmin_live_users", activeUsers);
 
       } catch (error) {
         console.error("Join Room Error:", error.message);
@@ -104,8 +104,8 @@ const socketHandler = (io) => {
           .populate("sender", "username")
           .populate("room", "roomCode");
 
-        io.to(formattedCode).emit("receive_message", populatedMessage);
-        io.to(formattedCode).emit("new_pending_message", populatedMessage);
+        socket.emit("receive_message", populatedMessage);
+        socket.emit("new_pending_message", populatedMessage);
 
       } catch (error) {
         console.error("Send Message Error:", error.message);
@@ -131,6 +131,9 @@ const socketHandler = (io) => {
 
         io.to(`broadcast_${roomCode}`)
           .emit("broadcast_message", message);
+
+        io.to(roomCode)
+          .emit("message_approved", message);
 
       } catch (error) {
         console.error("Approve Message Error:", error.message);

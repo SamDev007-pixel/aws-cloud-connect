@@ -51,8 +51,18 @@ const Admin = () => {
     if (!socket) return;
 
     const handleLoad = (msgs) => {
-      setPendingMessages(msgs);
-    };
+  setPendingMessages((prev) => {
+    const merged = [...msgs];
+
+    prev.forEach((oldMsg) => {
+      if (!merged.find((m) => m._id === oldMsg._id)) {
+        merged.push(oldMsg);
+      }
+    });
+
+    return merged;
+  });
+};
 
     const handleNew = (msg) => {
       setPendingMessages((prev) => {

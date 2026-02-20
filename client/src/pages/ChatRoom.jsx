@@ -152,17 +152,6 @@ const ChatInterface = ({ roomCode, userId }) => {
     return () => socket.disconnect();
   }, [roomCode, userId]);
 
-  // Auto refresh every 2 seconds
-  useEffect(() => {
-    if (!socketRef.current || !roomCode || !userId) return;
-
-    const interval = setInterval(() => {
-      socketRef.current.emit("join_room", { roomCode, role: "user", userId });
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [roomCode, userId]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
