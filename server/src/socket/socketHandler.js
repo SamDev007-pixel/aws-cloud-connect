@@ -22,6 +22,7 @@ const socketHandler = (io) => {
         }
 
         socket.join(formattedCode);
+        socket.join(`broadcast_${formattedCode}`);
 
         // 🔥 Track Online Users (Only for real users)
         if (userId) {

@@ -13,34 +13,52 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors());
+// ================================
+// 🔥 CORS CONFIG (IMPORTANT)
+// ================================
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use("/api/rooms", roomRoutes);
+
+// ================================
+// 🔥 SOCKET.IO SETUP
+// ================================
 const io = new Server(server, {
   cors: {
     origin: "*",
+    methods: ["GET", "POST"],
   },
+  transports: ["websocket", "polling"],
 });
-app.set("io", io);
-socketHandler(io);
-// Temporary basic socket
-io.on("connection", (socket) => {
-  console.log("User Connected:", socket.id);
 
-  socket.on("disconnect", () => {
-    console.log("User Disconnected:", socket.id);
-  });
-});
-// =====================================
-// 🔥 Message Routes (Pass io)
-// =====================================
+app.set("io", io);
+
+// Attach your main socket handler
+socketHandler(io);
+
+// ================================
+// 🔥 MESSAGE ROUTES
+// ================================
 const messageRoutes = require("./routes/messageRoutes");
 app.use("/api/messages", messageRoutes(io));
 
+// ================================
+// 🔥 HEALTH CHECK ROUTE
+// ================================
 app.get("/", (req, res) => {
   res.send("AWS Cloud Connect Backend Running 🚀");
 });
 
+// ================================
+// 🔥 START SERVER
+// ================================
 const PORT = process.env.PORT || 5001;
 
 server.listen(PORT, () => {
